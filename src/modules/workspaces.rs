@@ -414,11 +414,21 @@ impl Workspaces {
                                 }
                             });
 
+                            let bold_font = iced::Font {
+                                family: iced::font::Family::Name("NERD_FONT"),
+                                weight: iced::font::Weight::Black, // You can also use Weight::Semibold, Weight::Light, etc.
+                                ..Default::default()
+                            };
+
                             Some(
                                 button(
-                                    container(text(w.name.as_str()).size(theme.font_size.xs))
-                                        .align_x(alignment::Horizontal::Center)
-                                        .align_y(alignment::Vertical::Center),
+                                    container(
+                                        text(w.name.as_str())
+                                            .font(bold_font)
+                                            .size(theme.font_size.xs),
+                                    )
+                                    .align_x(alignment::Horizontal::Center)
+                                    .align_y(alignment::Vertical::Center),
                                 )
                                 .style(theme.workspace_button_style(empty, color))
                                 .padding(if w.id < 0 {

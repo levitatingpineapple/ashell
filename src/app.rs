@@ -461,10 +461,11 @@ impl App {
                     } else {
                         HEIGHT - 8.
                     } as f32)
-                    .padding(if self.theme.bar_style == AppearanceStyle::Islands {
-                        [self.theme.space.xxs, self.theme.space.xxs]
-                    } else {
-                        [0, 0]
+                    .padding(iced::Padding {
+                        top: 0.,
+                        right: 8.,
+                        bottom: 4.,
+                        left: 8.,
                     });
 
                 let status_bar = container(centerbox).style(|t: &Theme| container::Style {
