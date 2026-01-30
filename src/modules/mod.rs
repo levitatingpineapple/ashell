@@ -5,6 +5,7 @@ use crate::{
     theme::AshellTheme,
     widgets::position_button,
 };
+use hex_color::rgb;
 use iced::{
     Alignment, Border, Color, Element, Length, Subscription,
     widget::{Row, container, row},
@@ -125,9 +126,9 @@ impl App {
                                     .into(),
                             ),
                             border: Border {
-                                width: 0.0,
+                                width: 1.0,
                                 radius: self.theme.radius.lg.into(),
-                                color: Color::TRANSPARENT,
+                                color: Color::from_rgb8(60, 60, 60),
                             },
                             ..container::Style::default()
                         })

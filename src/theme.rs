@@ -632,9 +632,9 @@ impl AshellTheme {
                     }
                 },
                 border: Border {
-                    width: 0.0,
+                    width: 1.0,
                     radius: self.radius.lg.into(),
-                    color: Color::TRANSPARENT,
+                    color: Color::from_rgb8(60, 60, 60),
                 },
                 text_color: theme.palette().text,
                 ..button::Style::default()
