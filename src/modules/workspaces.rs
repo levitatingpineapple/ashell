@@ -413,18 +413,11 @@ impl Workspaces {
                                         .copied()
                                 }
                             });
-
-                            let bold_font = iced::Font {
-                                family: iced::font::Family::Name("NERD_FONT"),
-                                weight: iced::font::Weight::Black, // You can also use Weight::Semibold, Weight::Light, etc.
-                                ..Default::default()
-                            };
-
                             Some(
                                 button(
                                     container(
                                         text(w.name.as_str())
-                                            .font(bold_font)
+                                            // .font(bold_font)
                                             .size(theme.font_size.xs),
                                     )
                                     .align_x(alignment::Horizontal::Center)
