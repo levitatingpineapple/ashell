@@ -3,7 +3,7 @@ use crate::remote_value::Remote;
 use super::{ReadOnlyService, Service, ServiceEvent};
 use iced::{
     Subscription, Task,
-    futures::{SinkExt, StreamExt, channel::mpsc::Sender, executor::block_on, stream::pending},
+    futures::{SinkExt, StreamExt, channel::mpsc::Sender, stream::pending},
     stream::channel,
 };
 use itertools::Either;
@@ -604,31 +604,53 @@ impl PulseAudioServer {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
         let handle = thread::spawn(move || {
-            block_on(async move {
+            tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .build()
+                .unwrap()
+                .block_on(async move {
                 match Self::new() {
                     Ok(mut server) => {
                         let _ = tx.send(true);
+                        let mut pending_sink_volume: Option<(String, ChannelVolumes)> = None;
+                        let mut pending_source_volume: Option<(String, ChannelVolumes)> = None;
+                        let mut throttle_timer =
+                            tokio::time::interval(std::time::Duration::from_millis(100));
+                        throttle_timer.tick().await; // consume first immediate tick
+
                         loop {
-                            match to_sever_tx.recv().await {
-                                Some(PulseAudioCommand::SinkMute(name, mute)) => {
-                                    let _ = server.set_sink_mute(&name, mute);
+                            tokio::select! {
+                                cmd = to_sever_tx.recv() => {
+                                    match cmd {
+                                        Some(PulseAudioCommand::SinkMute(name, mute)) => {
+                                            let _ = server.set_sink_mute(&name, mute);
+                                        }
+                                        Some(PulseAudioCommand::SourceMute(name, mute)) => {
+                                            let _ = server.set_source_mute(&name, mute);
+                                        }
+                                        Some(PulseAudioCommand::SinkVolume(name, volume)) => {
+                                            pending_sink_volume = Some((name, volume));
+                                        }
+                                        Some(PulseAudioCommand::SourceVolume(name, volume)) => {
+                                            pending_source_volume = Some((name, volume));
+                                        }
+                                        Some(PulseAudioCommand::DefaultSink(name, port)) => {
+                                            let _ = server.set_default_sink(&name, port.as_deref());
+                                        }
+                                        Some(PulseAudioCommand::DefaultSource(name, port)) => {
+                                            let _ = server.set_default_source(&name, port.as_deref());
+                                        }
+                                        None => {}
+                                    }
                                 }
-                                Some(PulseAudioCommand::SourceMute(name, mute)) => {
-                                    let _ = server.set_source_mute(&name, mute);
+                                _ = throttle_timer.tick() => {
+                                    if let Some((name, volume)) = pending_sink_volume.take() {
+                                        let _ = server.set_sink_volume(&name, &volume);
+                                    }
+                                    if let Some((name, volume)) = pending_source_volume.take() {
+                                        let _ = server.set_source_volume(&name, &volume);
+                                    }
                                 }
-                                Some(PulseAudioCommand::SinkVolume(name, volume)) => {
-                                    let _ = server.set_sink_volume(&name, &volume);
-                                }
-                                Some(PulseAudioCommand::SourceVolume(name, volume)) => {
-                                    let _ = server.set_source_volume(&name, &volume);
-                                }
-                                Some(PulseAudioCommand::DefaultSink(name, port)) => {
-                                    let _ = server.set_default_sink(&name, port.as_deref());
-                                }
-                                Some(PulseAudioCommand::DefaultSource(name, port)) => {
-                                    let _ = server.set_default_source(&name, port.as_deref());
-                                }
-                                None => {}
                             }
                         }
                     }
