@@ -113,6 +113,8 @@ pub struct AudioData {
 pub struct AudioService {
     data: AudioData,
     commander: UnboundedSender<PulseAudioCommand>,
+    player_tx: Option<tokio::sync::mpsc::Sender<()>>,
+    last_announced_volume: Option<u32>,
 }
 
 impl Deref for AudioService {
@@ -149,6 +151,8 @@ impl AudioService {
                         .send(ServiceEvent::Init(AudioService {
                             data: AudioData::default(),
                             commander: handle.sender.clone(),
+                            player_tx: player::tock_player().ok(),
+                            last_announced_volume: None,
                         }))
                         .await;
                     State::Active(handle)
@@ -220,6 +224,19 @@ impl AudioService {
                 }
             })
             .unwrap_or_default();
+
+        let step = libpulse_binding::volume::Volume::NORMAL.0 / 20; // 5%
+        if let Some(last) = self.last_announced_volume {
+            if volume.abs_diff(last) >= step {
+                self.last_announced_volume = Some(volume);
+                if let Some(tx) = &self.player_tx {
+                    let _ = tx.try_send(());
+                }
+            }
+        } else {
+            self.last_announced_volume = Some(volume);
+        }
+
         self.sink_slider.receive(volume);
     }
 
@@ -868,5 +885,25 @@ impl From<&SourceInfo<'_>> for Device {
                 })
                 .collect::<Vec<_>>(),
         }
+    }
+}
+
+mod player {
+    use rodio::{Decoder, DeviceSinkBuilder, Source};
+    use std::io::Cursor;
+    use tokio::sync::mpsc;
+
+    pub fn tock_player() -> Result<mpsc::Sender<()>, Box<dyn std::error::Error>> {
+        let (tx, mut rx) = mpsc::channel(100);
+        let wav_data = include_bytes!("../../assets/tock.wav");
+        let cursor = Cursor::new(wav_data);
+        let tock = Decoder::new(cursor)?.buffered();
+        let handle = DeviceSinkBuilder::open_default_sink()?;
+        tokio::spawn(async move {
+            while let Some(_) = rx.recv().await {
+                handle.mixer().add(tock.clone());
+            }
+        });
+        Ok(tx)
     }
 }
